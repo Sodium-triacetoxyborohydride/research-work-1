@@ -1,5 +1,19 @@
 from docx import Document
 import joblib
+import nltk
+from nltk.stem import WordNetLemmatizer
+
+# Загрузка и инициализация лемматизатора
+nltk.download('punkt')
+nltk.download('wordnet')
+lemmatizer = WordNetLemmatizer()
+
+
+def lemmatize_text(text):
+    words = nltk.word_tokenize(text)
+    lemmatized_text = " ".join([lemmatizer.lemmatize(word) for word in words])
+    return lemmatized_text
+
 
 # Функция для выбора типа документа
 def select_document_type():
@@ -9,19 +23,40 @@ def select_document_type():
     choice = input("Введите 1 или 2: ")
     return choice
 
+
 # Загрузка моделей и векторайзеров
 def load_models(choice):
-    if choice == '1':
-        # Логика для дипломов
-        model = joblib.load('random_forest_model.pkl')
-        tfidf_vectorizer = joblib.load('random_forest_model.pkl')
-    elif choice == '2':
-        # Логика для НИР
-        model = joblib.load('random_forest_model.pkl')
-        tfidf_vectorizer = joblib.load('random_forest_model.pkl')
-    else:
-        raise ValueError("Некорректный выбор. Перезапустите программу и выберите 1 или 2.")
+    model = joblib.load('random_forest_model_v2.pkl')
+    tfidf_vectorizer = joblib.load('tfidf_vectorizer_v2.pkl')
     return model, tfidf_vectorizer
+
+
+# Анализ текста с использованием модели
+def analyze_text_section(text, model, tfidf_vectorizer, expected_labels):
+    lemmatized_text = lemmatize_text(text)
+    vectorized_text = tfidf_vectorizer.transform([lemmatized_text])
+    prediction = model.predict(vectorized_text)
+
+    found_labels = [label for label in expected_labels if label in lemmatized_text.lower()]
+    not_found_labels = [label for label in expected_labels if label not in found_labels]
+
+    return found_labels, not_found_labels
+
+
+def process_section(doc, section_title):
+    section_start = False
+    section_texts = []
+
+    for para in doc.paragraphs:
+        if para.text.strip().upper() == section_title:
+            section_start = True
+        elif section_start and para.text.strip().upper() in ["ВВЕДЕНИЕ", "ЗАКЛЮЧЕНИЕ"]:
+            break
+        elif section_start:
+            section_texts.append(para.text.strip())
+
+    return " ".join(section_texts)
+
 
 # Анализ документа в зависимости от типа
 def analyze_document(filename, choice):
@@ -47,6 +82,26 @@ def analyze_document(filename, choice):
         print(f"Отсутствующие разделы: {', '.join(missing_sections)}")
     else:
         print("Все необходимые разделы присутствуют в документе.")
+
+        # Ожидаемые ключевые слова для введения и заключения
+    intro_labels = ['актуальность', 'цель', 'задачи']
+    conclusion_labels = ['изучено', 'поставлено', 'решено']
+
+    # Проверка введения
+    print("Анализ введения...")
+    vvedenie_text = process_section(doc, "ВВЕДЕНИЕ")
+    if vvedenie_text:
+        found, not_found = analyze_text_section(vvedenie_text, model, tfidf_vectorizer, intro_labels)
+        print(f"Во введении найдено: {', '.join(found)}")
+        print(f"Не найдено: {', '.join(not_found)}")
+
+    # Проверка заключения
+    print("Анализ заключения...")
+    zaklyuchenie_text = process_section(doc, "ЗАКЛЮЧЕНИЕ")
+    if zaklyuchenie_text:
+        found, not_found = analyze_text_section(zaklyuchenie_text, model, tfidf_vectorizer, conclusion_labels)
+        print(f"В заключении найдено: {', '.join(found)}")
+        print(f"Не найдено: {', '.join(not_found)}")
 
     # Анализ форматирования текста
     print("\nПроверка форматирования текста...")
@@ -81,6 +136,7 @@ def analyze_document(filename, choice):
             print(f"- {error}")
     else:
         print("Формулы оформлены правильно.")
+
 
 # Пример использования
 if __name__ == "__main__":
