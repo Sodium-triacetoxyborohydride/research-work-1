@@ -1,24 +1,46 @@
 from docx import Document
-from structure_analyzer import check_document_structure
-from text_format_analyzer import check_text_formatting
-from title_page_checker import check_title_page
-from table_checker import check_tables
-from formula_checker import check_formulas
 import joblib
 
-# Загрузка модели и векторайзера
-model = joblib.load('random_forest_model.pkl')
-tfidf_vectorizer = joblib.load('tfidf_vectorizer.pkl')
+# Функция для выбора типа документа
+def select_document_type():
+    print("Выберите тип документа для проверки:")
+    print("1. Диплом")
+    print("2. НИР")
+    choice = input("Введите 1 или 2: ")
+    return choice
 
-def analyze_text_section(text):
-    vectorized_text = tfidf_vectorizer.transform([text])
-    prediction = model.predict(vectorized_text)
-    sections = ['section', 'part1', 'part2', 'part3']
-    return {sections[i]: prediction[0][i] for i in range(len(sections))}
+# Загрузка моделей и векторайзеров
+def load_models(choice):
+    if choice == '1':
+        # Логика для дипломов
+        model = joblib.load('multi_label_rf_model.pkl')
+        tfidf_vectorizer = joblib.load('multi_label_tfidf_vectorizer.pkl')
+    elif choice == '2':
+        # Логика для НИР
+        model = joblib.load('nir_rf_model.pkl')
+        tfidf_vectorizer = joblib.load('nir_tfidf_vectorizer.pkl')
+    else:
+        raise ValueError("Некорректный выбор. Перезапустите программу и выберите 1 или 2.")
+    return model, tfidf_vectorizer
 
-def analyze_document(filename):
+# Анализ документа в зависимости от типа
+def analyze_document(filename, choice):
     doc = Document(filename)
 
+    if choice == '1':
+        from structure_analyzer import check_document_structure
+        from text_format_analyzer import check_text_formatting
+        from title_page_checker import check_title_page
+        from table_checker import check_tables
+        from formula_checker import check_formulas
+    elif choice == '2':
+        from structure_analyzer_nir import check_document_structure
+        from text_format_analyzer_nir import check_text_formatting
+        from title_page_checker_nir import check_title_page
+        from table_checker_nir import check_tables
+        from formula_checker_nir import check_formulas
+
+    # Анализ структуры
     print("Проверка структуры документа...")
     missing_sections = check_document_structure(doc)
     if missing_sections:
@@ -26,9 +48,11 @@ def analyze_document(filename):
     else:
         print("Все необходимые разделы присутствуют в документе.")
 
+    # Анализ форматирования текста
     print("\nПроверка форматирования текста...")
     check_text_formatting(doc)
 
+    # Проверка титульного листа
     print("\nПроверка титульного листа...")
     title_page_errors = check_title_page(doc)
     if title_page_errors:
@@ -38,6 +62,7 @@ def analyze_document(filename):
     else:
         print("Титульный лист оформлен правильно.")
 
+    # Проверка таблиц
     print("\nПроверка таблиц...")
     table_errors = check_tables(doc)
     if table_errors:
@@ -47,6 +72,7 @@ def analyze_document(filename):
     else:
         print("Таблицы оформлены правильно.")
 
+    # Проверка формул
     print("\nПроверка формул...")
     formula_errors = check_formulas(doc)
     if formula_errors:
@@ -56,11 +82,8 @@ def analyze_document(filename):
     else:
         print("Формулы оформлены правильно.")
 
-    print("\nАнализ текстовых разделов...")
-    for para in doc.paragraphs:
-        prediction = analyze_text_section(para.text)
-        print(f"Текст: {para.text[:30]}... -> {prediction}")
-
 # Пример использования
 if __name__ == "__main__":
-    analyze_document('tests/типа диплом.docx')
+    choice = select_document_type()
+    model, tfidf_vectorizer = load_models(choice)
+    analyze_document('ваш_документ.docx', choice)
