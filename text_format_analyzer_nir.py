@@ -18,4 +18,8 @@ def check_text_formatting(doc):
                 errors.append(
                     f"Параграф с текстом '{paragraph.text[:30]}...' не соответствует стилю шрифта Times New Roman 14pt.")
 
-    return errors
+    if errors:
+        for error in errors:
+            print(error)
+    else:
+        print("Все тексты оформлены правильно.")
